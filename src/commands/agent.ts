@@ -373,6 +373,7 @@ export async function agentCommand(
       });
 
       let streamedText = "";
+      const acpStatusLines: string[] = [];
       let stopReason: string | undefined;
       try {
         const dispatchPolicyError = resolveAcpDispatchPolicyError(cfg);
@@ -397,6 +398,18 @@ export async function agentCommand(
           onEvent: (event) => {
             if (event.type === "done") {
               stopReason = event.stopReason;
+              return;
+            }
+            if (event.type === "status" && event.text.trim()) {
+              acpStatusLines.push(event.text.trim());
+              return;
+            }
+            if (event.type === "tool_call" && event.text.trim()) {
+              acpStatusLines.push(`[tool] ${event.text.trim()}`);
+              return;
+            }
+            if (event.type === "error" && event.message.trim()) {
+              acpStatusLines.push(`[error] ${event.message.trim()}`);
               return;
             }
             if (event.type !== "text_delta") {
@@ -447,6 +460,8 @@ export async function agentCommand(
       });
 
       const finalText = streamedText.trim();
+      const fallbackText = acpStatusLines.join("\n").trim();
+      const transcriptAssistantText = finalText || fallbackText;
       const payloads = finalText
         ? [
             {
@@ -454,16 +469,16 @@ export async function agentCommand(
             },
           ]
         : [];
-      if (finalText) {
+      if (transcriptAssistantText) {
         const transcriptPath = resolveSessionFilePath(
           sessionId,
           sessionEntry,
-          resolveSessionFilePathOptions({ cfg, agentId: sessionAgentId }),
+          resolveSessionFilePathOptions({ agentId: sessionAgentId, storePath }),
         );
         const appended = appendAcpTurnToTranscript({
           transcriptPath,
           userText: body,
-          assistantText: finalText,
+          assistantText: transcriptAssistantText,
         });
         if (!appended.ok) {
           runtime.error?.(`acp transcript append failed: ${appended.error}`);
