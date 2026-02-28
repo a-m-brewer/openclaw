@@ -7,6 +7,7 @@ import { AcpRuntimeError } from "../acp/runtime/errors.js";
 import * as embeddedModule from "../agents/pi-embedded.js";
 import type { OpenClawConfig } from "../config/config.js";
 import * as configModule from "../config/config.js";
+import { resolveSessionTranscriptPath } from "../config/sessions.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { agentCommand } from "./agent.js";
 
@@ -173,6 +174,14 @@ describe("agentCommand ACP runtime routing", () => {
         .mocked(runtime.log)
         .mock.calls.some(([first]) => typeof first === "string" && first.includes("ACP_OK"));
       expect(hasAckLog).toBe(true);
+
+      const transcriptPath = resolveSessionTranscriptPath("acp-session-1", "codex");
+      expect(fs.existsSync(transcriptPath)).toBe(true);
+      const transcriptRaw = fs.readFileSync(transcriptPath, "utf8");
+      expect(transcriptRaw).toContain('"role":"user"');
+      expect(transcriptRaw).toContain('"role":"assistant"');
+      expect(transcriptRaw).toContain("ping");
+      expect(transcriptRaw).toContain("ACP_OK");
     });
   });
 

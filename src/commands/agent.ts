@@ -67,6 +67,7 @@ import { applyVerboseOverride } from "../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js";
 import { resolveSendPolicy } from "../sessions/send-policy.js";
 import { resolveMessageChannel } from "../utils/message-channel.js";
+import { appendAcpTurnToTranscript } from "./agent/acp-transcript.js";
 import { deliverAgentCommandResult } from "./agent/delivery.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
@@ -453,6 +454,21 @@ export async function agentCommand(
             },
           ]
         : [];
+      if (finalText) {
+        const transcriptPath = resolveSessionFilePath(
+          sessionId,
+          sessionEntry,
+          resolveSessionFilePathOptions({ cfg, agentId: sessionAgentId }),
+        );
+        const appended = appendAcpTurnToTranscript({
+          transcriptPath,
+          userText: body,
+          assistantText: finalText,
+        });
+        if (!appended.ok) {
+          runtime.error?.(`acp transcript append failed: ${appended.error}`);
+        }
+      }
       const result = {
         payloads,
         meta: {
